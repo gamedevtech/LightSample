@@ -37,6 +37,7 @@ double GetMilliseconds();
 void Normalize(GLfloat *a);
 void DrawTriangle(GLfloat *a, GLfloat *b, GLfloat *c, int div, float r);
 void DrawSphere(int ndiv, float radius=1.0);
+void DrawPlane(int subdiv);
 
 static GLfloat vdata[12][3] = {
     {-X, 0.0, Z}, {X, 0.0, Z}, {-X, 0.0, -Z}, {X, 0.0, -Z},
@@ -52,7 +53,7 @@ static GLuint tindices[20][3] = {
 };
 
 static double prevTime = 0.0;
-static float rotation = 0.0f;
+static float rotation = 270.0f;
 static int glutWindowId = 0;
 
 int main(int argc, char** argv) {
@@ -89,20 +90,28 @@ void Shutdown() {
 }
 
 float diffuseColor[] = {1.0f, 0.0f, 0.0f, 1.0f};
-float lightDirection[] = {-7.0f, 0.0f, -7.0f, 1.0f};
-float eyePos[] = {-5.0f, 5.0f, -5.0f};
+float lightDirection[] = {2.0f, 2.0f, 2.0f, 1.0f};
+float eyePos[] = {-11.0f, 8.0f, -7.0f};
 float target[] = {0.0f, 0.0f, 0.0f};
 bool rotateModel = false;
 float attenC = 1.0f;
 float attenL = 0.0f;
 float attenQ = 0.0f;
 
+bool planeVisible = true;
+float planeScale[] = {10.0f, 1.0f, 10.0f};
+float planeTranslate[] = {0.0f, 0.0f, 0.0f};
+
+bool sphereVisible = true;
+float sphereScale[] = {1.0f, 1.0f, 1.0f};
+float sphereTranslate[] = {0.0f, 3.0f, 0.0f};
+
 void Initialize() {
     glShadeModel(GL_SMOOTH);
     glEnable(GL_DEPTH_TEST);
  
     glDisable(GL_COLOR_MATERIAL);
-    glEnable(GL_CULL_FACE);
+    glEnable(GL_CULL_FACE); // TODO: Enable?
     glCullFace(GL_BACK);
     glFrontFace(GL_CCW);
     glBlendEquation(GL_FUNC_ADD);
@@ -151,9 +160,29 @@ void display() {
     
     glRotatef(rotation, 0.0f, 1.0f, 0.0f);
     glLightfv(GL_LIGHT0, GL_POSITION, lightDirection);
+    glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseColor);
+    glLightfv(GL_LIGHT0, GL_SPECULAR, diffuseColor);
+    
+    glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, attenC);
+    glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, attenL);
+    glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, attenQ);
     
     glColor3f(1.0f, 1.0f, 1.0f);
-    DrawSphere(5);
+    if (sphereVisible) {
+        glPushMatrix();
+        glTranslatef(sphereTranslate[0], sphereTranslate[1], sphereTranslate[2]);
+        glScalef(sphereScale[0], sphereScale[1], sphereScale[2]);
+        DrawSphere(5);
+        glPopMatrix();
+    }
+    
+    if (planeVisible) {
+        glPushMatrix();
+        glTranslatef(planeTranslate[0], planeTranslate[1], planeTranslate[2]);
+        glScalef(planeScale[0], planeScale[1], planeScale[2]);
+        DrawPlane(400);
+        glPopMatrix();
+    }
     
     glDisable(GL_LIGHTING);
     glBegin(GL_LINES);
@@ -187,7 +216,7 @@ void DoGUI() {
                                     ImGuiWindowFlags_NoCollapse |
                                     ImGuiWindowFlags_NoMove;
     glDisable(GL_LIGHTING);
-    ImGui_ImplGLUT_NewFrame((int)ImGui::GetIO().DisplaySize.x, (int)ImGui::GetIO().DisplaySize.y, 1.0f / 30.0f);
+    ImGui_ImplGLUT_NewFrame((int)ImGui::GetIO().DisplaySize.x, (int)ImGui::GetIO().DisplaySize.y, 1.0f / 60.0f);
     
     static bool showLightConfig = true;
     static bool showAppConfig = true;
@@ -199,39 +228,28 @@ void DoGUI() {
         ImGui::SetNextWindowSize(ImVec2(330,120));
     }
     ImGui::Begin("Light", &showLightConfig, window_flags);
-    if (ImGui::ColorEdit3("Diffuse Color", (float*)&diffuseColor)) {
-        glLightfv(GL_LIGHT0, GL_DIFFUSE, diffuseColor);
-        glLightfv(GL_LIGHT0, GL_SPECULAR, diffuseColor);
-    }
+    ImGui::ColorEdit3("Diffuse Color", (float*)&diffuseColor);
     float dir = lightDirection[3];
-    if (ImGui::DragFloat3("Light Pos/Dir", lightDirection)) {
-        glLightfv(GL_LIGHT0, GL_POSITION, lightDirection);
-    }
+    ImGui::DragFloat3("Light Pos/Dir", lightDirection, 0.5f);
     lightDirection[3] = dir;
     
     ImGui::PushItemWidth(50.0f);
-    if (ImGui::DragFloat("C", &attenC)) {
+    if (ImGui::DragFloat("C", &attenC, 0.001f)) {
         if (attenC <= 0.0f) {
             attenC = 0.0f;
         }
-        glLightf(GL_LIGHT0, GL_CONSTANT_ATTENUATION, attenC);
-        glLightfv(GL_LIGHT0, GL_POSITION, lightDirection);
     }
     ImGui::SameLine();
-    if (ImGui::DragFloat("L", &attenL)) {
+    if (ImGui::DragFloat("L", &attenL, 0.001f)) {
         if (attenL <= 0.0f) {
             attenL = 0.0f;
         }
-        glLightf(GL_LIGHT0, GL_LINEAR_ATTENUATION, attenL);
-        glLightfv(GL_LIGHT0, GL_POSITION, lightDirection);
     }
     ImGui::SameLine();
-    if (ImGui::DragFloat("Q", &attenQ)) {
+    if (ImGui::DragFloat("Q", &attenQ, 0.001f)) {
         if (attenQ <= 0.0f) {
             attenQ = 0.0f;
         }
-        glLightf(GL_LIGHT0, GL_QUADRATIC_ATTENUATION, attenQ);
-        glLightfv(GL_LIGHT0, GL_POSITION, lightDirection);
     }
     ImGui::SameLine();
     ImGui::Text("Attenuation");
@@ -243,7 +261,6 @@ void DoGUI() {
         else {
             lightDirection[3] = 0.0f;
         }
-        glLightfv(GL_LIGHT0, GL_POSITION, lightDirection);
     }
     ImGui::End();
     
@@ -253,22 +270,59 @@ void DoGUI() {
         ImGui::SetNextWindowSize(ImVec2(310,100));
     }
     ImGui::Begin("Camera", &showLightConfig, window_flags);
-    ImGui::DragFloat3("Eye Position", eyePos);
-    ImGui::DragFloat3("Target", target);
+    ImGui::DragFloat3("Eye Position", eyePos, 0.25f);
+    ImGui::DragFloat3("Target", target, 0.25f);
     ImGui::Checkbox("Rotate View", &rotateModel);
     ImGui::End();
     
     if (firstRun) {
-    ImGui::SetNextWindowPos(ImVec2(10,140));
-    ImGui::SetNextWindowSize(ImVec2(200,100));
+        ImGui::SetNextWindowPos(ImVec2(670,10));
+        ImGui::SetNextWindowSize(ImVec2(120,80));
     }
-    ImGui::Begin("Window", &showAppConfig, window_flags);
+    ImGui::Begin("Application", &showAppConfig, window_flags);
     
     if (ImGui::Button("Quit")) {
         exit(0);
     }
+    if (ImGui::Button("Reset")) {
+        exit(0);
+    }
     ImGui::End();
     
+    if (firstRun) {
+        ImGui::SetNextWindowPos(ImVec2(10, 140));
+        ImGui::SetNextWindowSize(ImVec2(330,170));
+    }
+    ImGui::Begin("Scene", &showLightConfig, window_flags);
+    ImGui::Checkbox("Plane", &planeVisible);
+    
+    ImGui::Indent();
+    ImGui::PushID(900);
+    ImGui::DragFloat3("Scale", planeScale, 0.5f);
+    ImGui::PopID();
+    ImGui::Unindent();
+    
+    ImGui::Indent();
+    ImGui::PushID(1000);
+    ImGui::DragFloat3("Translate", planeTranslate, 0.5f);
+    ImGui::PopID();
+    ImGui::Unindent();
+    
+    ImGui::Checkbox("Sphere", &sphereVisible);
+    
+    ImGui::Indent();
+    ImGui::PushID(1100);
+    ImGui::DragFloat3("Scale", sphereScale, 0.5f);
+    ImGui::PopID();
+    ImGui::Unindent();
+    
+    ImGui::Indent();
+    ImGui::PushID(1200);
+    ImGui::DragFloat3("Translate", sphereTranslate, 0.5f);
+    ImGui::PopID();
+    ImGui::Unindent();
+
+    ImGui::End();
     
     
     glViewport(0, 0, (int)ImGui::GetIO().DisplaySize.x, (int)ImGui::GetIO().DisplaySize.y);
@@ -373,6 +427,36 @@ double GetMilliseconds() {
 void Normalize(GLfloat *a) {
     GLfloat d=sqrt(a[0]*a[0]+a[1]*a[1]+a[2]*a[2]);
     a[0]/=d; a[1]/=d; a[2]/=d;
+}
+
+void DrawPlane(int subdiv) {
+    glBegin(GL_TRIANGLES);
+    for (int x = 0; x < subdiv; ++x) {
+        for (int z = 0; z < subdiv; ++z) {
+            float divisionStep = 2.0f / ((float)subdiv);
+            
+            float xMin = -1.0f + ((float)x) * divisionStep;
+            float xMax = xMin + divisionStep;
+            
+            float zMin = -1.0f + ((float)z) * divisionStep;
+            float zMax = zMin + divisionStep;
+            
+            glNormal3f(0.0f, 1.0f, 0.0f);
+            glVertex3f(xMax, 0.0f, zMin);
+            glNormal3f(0.0f, 1.0f, 0.0f);
+            glVertex3f(xMin, 0.0f, zMin);
+            glNormal3f(0.0f, 1.0f, 0.0f);
+            glVertex3f(xMin, 0.0f, zMax);
+            
+            glNormal3f(0.0f, 1.0f, 0.0f);
+            glVertex3f(xMax, 0.0f, zMin);
+            glNormal3f(0.0f, 1.0f, 0.0f);
+            glVertex3f(xMin, 0.0f, zMax);
+            glNormal3f(0.0f, 1.0f, 0.0f);
+            glVertex3f(xMax, 0.0f, zMax);
+        }
+    }
+    glEnd();
 }
 
 void DrawTriangle(GLfloat *a, GLfloat *b, GLfloat *c, int div, float r) {
